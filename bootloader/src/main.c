@@ -104,7 +104,15 @@ main(int argc, char **argv)
     fpsetmask(m & ~FP_X_OFL);
     #endif
 
-    res = pyi_main(argc, argv);
+    if (getenv("KART_USE_HELPER")) {
+        // start or use an existing helper process
+//        printf("%s\n", create_monitor_with_helpers());
+       printf("%s\n", argv[0]);
+       res = -1;
+    } else {
+        // run the full application as normal
+        res = pyi_main(argc, argv);
+    }
     return res;
 }
 
