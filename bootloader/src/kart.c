@@ -36,7 +36,6 @@ int kart_main(int argc, char **argv, char **environ)
         char *ptr = 0;
 
         int listSZ;
-
         for (listSZ = 0; environ[listSZ] != NULL; listSZ++)
             ;
         char **helper_environ = malloc((listSZ - 1) * sizeof(*helper_environ));
@@ -44,24 +43,25 @@ int kart_main(int argc, char **argv, char **environ)
         cJSON *env = NULL;
         cJSON *args = NULL;
         size_t index = 0;
-
         cJSON *payload = cJSON_CreateObject();
-
         cJSON_AddNumberToObject(payload, "pid", getpid());
-
         env = cJSON_AddObjectToObject(payload, "environ");
-
         int found = 0;
         /* while the current string pointed to by *env_variable is not empty, increment it. */
         for (env_ptr = environ; *env_ptr != NULL; env_ptr++)
         {
             int i = 0;
-            char temp[1024] = "";
+            char temp[4096] = "";
+            int envlen;
+            if ((envlen = strlen(*env_ptr)) > 4096)
+            {
+                printf("env var too long\n"); // TODO - need to handle this better
+            }
             strcpy(temp, *env_ptr);
             ptr = strtok(temp, "=");
 
-            char key[1024];
-            char val[1024];
+            char key[4096];
+            char val[4096];
 
             while (ptr != NULL)
             {
