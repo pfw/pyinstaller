@@ -36,6 +36,8 @@
 #include "pyi_global.h"
 #include "pyi_win32_utils.h"
 
+#include "kart.h"
+
 #ifdef __FreeBSD__
     #include <floatingpoint.h>
 #endif
@@ -86,7 +88,7 @@ wmain(int argc, wchar_t* argv[])
  */
 
 int
-main(int argc, char **argv)
+main(int argc, char **argv, char **envp)
 {
     int res;
 
@@ -101,6 +103,11 @@ main(int argc, char **argv)
     m = fpgetmask();
     fpsetmask(m & ~FP_X_OFL);
     #endif
+    
+    if ((res = kart_main(argc, argv, envp)) != -9999) {
+        // kart ran in helper mode
+        return res;
+    };
 
     res = pyi_main(argc, argv);
     return res;
