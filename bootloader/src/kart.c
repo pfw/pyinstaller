@@ -1,4 +1,7 @@
 #include "kart.h"
+
+#define _XOPEN_SOURCE 1
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
