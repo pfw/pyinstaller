@@ -41,7 +41,7 @@ int kart_main(int argc, char **argv, char **environ)
         int listSZ;
         for (listSZ = 0; environ[listSZ] != NULL; listSZ++)
             ;
-        char **helper_environ = malloc((listSZ - 1) * sizeof(*helper_environ));
+        char **helper_environ = malloc(listSZ * sizeof(char *));
 
         cJSON *env = NULL;
         cJSON *args = NULL;
@@ -85,6 +85,8 @@ int kart_main(int argc, char **argv, char **environ)
                 cJSON_AddStringToObject(env, key, val);
             }
         }
+        helper_environ[listSZ] = NULL;
+
         char **arg_ptr;
         args = cJSON_AddArrayToObject(payload, "argv");
         for (arg_ptr = argv; *arg_ptr != NULL; arg_ptr++)
@@ -109,12 +111,7 @@ int kart_main(int argc, char **argv, char **environ)
             // start helper in background and wait
             char *cmd = argv[0];
 
-            char **helper_argv = (char **)malloc((4 + 1) * sizeof(char *));
-            helper_argv[0] = cmd;
-            helper_argv[1] = "helper";
-            helper_argv[2] = "--socket";
-            helper_argv[3] = socket_filename;
-            helper_argv[4] = 0;
+            char* helper_argv[] = {cmd, "helper", "--socket", socket_filename, NULL};
 
             pid_t pid;
             int status;
@@ -126,7 +123,7 @@ int kart_main(int argc, char **argv, char **environ)
                 exit(1);
             }
 
-            int rtc, max_retry = 10;
+            int rtc, max_retry = 50;
             while ((rtc = connect(socket_fd, (struct sockaddr *)&addr, sizeof addr)) != 0 && --max_retry >= 0)
             {
                 usleep(250000);
