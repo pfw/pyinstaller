@@ -108,19 +108,37 @@ int kart_main(int argc, char **argv, char **environ)
 
         if (connect(socket_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
         {
-            // start helper in background and wait
-            char *cmd = argv[0];
-
-            char* helper_argv[] = {cmd, "helper", "--socket", socket_filename, NULL};
-
-            pid_t pid;
             int status;
-
-            status = posix_spawnp(&pid, cmd, NULL, NULL, helper_argv, helper_environ);
-            if (status < 0)
+            if (fork() == 0)
             {
-                printf("Error running kart helper: %s", strerror(status));
-                exit(1);
+                if (fork() == 0)
+                {
+                    setsid();
+                    close(0);
+                    close(1);
+                    close(2);
+                    // start helper in background and wait
+                    char *cmd = argv[0];
+
+                    char *helper_argv[] = {cmd, "helper", "--socket", socket_filename, NULL};
+
+                    pid_t pid;
+                    int status;
+                    // printf("about to spawnp\n");
+
+                    status = posix_spawnp(&pid, cmd, NULL, NULL, helper_argv, helper_environ);
+                    // printf("done spawnp\n");
+                    if (status < 0)
+                    {
+                        printf("Error running kart helper: %s", strerror(status));
+                        exit(1);
+                    }
+                }
+                exit(0);
+            }
+            else
+            {
+                wait(&status);
             }
 
             int rtc, max_retry = 50;
