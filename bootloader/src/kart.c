@@ -51,35 +51,20 @@ int kart_main(int argc, char **argv, char **environ)
         cJSON *payload = cJSON_CreateObject();
         cJSON_AddNumberToObject(payload, "pid", getpid());
         env = cJSON_AddObjectToObject(payload, "environ");
+        
         int found = 0;
-        /* while the current string pointed to by *env_variable is not empty, increment it. */
+        // filter the environment so that KART_USE_HELPER isn't passed to the
+        // spawned process and so getting into a loop
         for (env_ptr = environ; *env_ptr != NULL; env_ptr++)
-        {
-            int i = 0;
-            char temp[4096] = "";
-            int envlen;
-            if ((envlen = strlen(*env_ptr)) > 4096)
-            {
-                printf("env var too long\n"); // TODO - need to handle this better
-            }
-            strcpy(temp, *env_ptr);
-            ptr = strtok(temp, "=");
+        {   
+            char *key = malloc(strlen(*env_ptr));
+            char *val = malloc(strlen(*env_ptr));
 
-            char key[4096];
-            char val[4096];
-
-            while (ptr != NULL)
-            {
-                if (i == 0) /* in the first iteration we get the left part so we store it */
-                    strcpy(key, ptr);
-
-                if (i == 1) /* in the second iteration we get the right part so we store it */
-                    strcpy(val, ptr);
-
-                ptr = strtok(NULL, "="); /* set 'ptr' to point to the right part,
-                                            if this is already the second iteration,
-                                            it will point to NULL */
-                i++;
+            if (sscanf(*env_ptr, "%[^=]=%s", key, val) != 2) {
+                // not found with two values in a key=value pair
+                if (sscanf(*env_ptr, "%[^=]=", key) != 1) {
+                    printf("error reading environment variable where only name is present\n");
+                }
             }
             if (strcmp(key, "KART_USE_HELPER"))
             {
@@ -108,11 +93,17 @@ int kart_main(int argc, char **argv, char **environ)
         addr.sun_family = AF_UNIX;
         strcpy(addr.sun_path, socket_filename);
 
+        // if there is no open socket perform a double fork and spawn to 
+        // detach the helper, wait till the first forked child has completed
+        // then attempt to connect to the socket the helper will open
         if (connect(socket_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
         {
             int status;
             if (fork() == 0)
             {
+                // create a grandchild process and close stdin/stdout/stderr
+                // to detach the helper process and ensure no fd's from the initial calling
+                // process are left open in it
                 if (fork() == 0)
                 {
                     setsid();
@@ -126,10 +117,8 @@ int kart_main(int argc, char **argv, char **environ)
 
                     pid_t pid;
                     int status;
-                    // printf("about to spawnp\n");
-
+                    
                     status = posix_spawnp(&pid, cmd, NULL, NULL, helper_argv, helper_environ);
-                    // printf("done spawnp\n");
                     if (status < 0)
                     {
                         printf("Error running kart helper: %s", strerror(status));
@@ -161,11 +150,6 @@ int kart_main(int argc, char **argv, char **environ)
             printf("Error setting up result communication with helper %s\n", strerror(errno));
             return 5;
         };
-
-        // set the 'unused' semval
-        // union semun semopts;
-        // semopts.val = -1;
-        // semctl(semid, 0, SETVAL, semopts);
 
         cJSON_AddNumberToObject(payload, "semid", semid);
         char *payload_string = cJSON_Print(payload);
@@ -202,27 +186,10 @@ int kart_main(int argc, char **argv, char **environ)
         {
             printf("Error sending command to kart helper %s\n", strerror(errno));
             return 3;
-        };
-
-        // loop until the semaphore value has changed.
-        // this seems more sensible but I think it means this
-        // process will close before the helper has flushed the file descriptors
-        // which does funky things, eg. output after the shell shows
-        // this process as finished
-        // int semval;
-        // for (int i = 0; i < 1000; i += 10) {
-        //     semval = semctl(semid, 0, GETVAL);
-        //     if (semval != -1) {
-        //         int exit_code = semval - 1000;
-        //         semctl(semid, 0, IPC_RMID);
-        //         exit(exit_code);
-        //     } else {
-        //         usleep(i * 1000);
-        //         printf("sleep for %d useconds\n", i*1000);
-        //     }
-        // }
-
-        sleep(3600); // this should be as long as the longest command, clone etc, how long?
+        }; 
+        
+        // The process needs to sleep for as long as the longest command, clone etc. could take.
+        sleep(86400); 
         printf("Timed out, no response from kart helper\n");
         return 4;
     }
