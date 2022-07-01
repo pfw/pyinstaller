@@ -33,7 +33,8 @@ void exit_on_alarm(int sig)
 int kart_main(int argc, char **argv, char **environ)
 {
     int res;
-    if (getenv("KART_USE_HELPER"))
+    char *use_helper = getenv("KART_USE_HELPER");
+    if (use_helper != NULL && *use_helper != '\0' && *use_helper != ' ' && *use_helper != '0')
     {
         // start or use an existing helper process
         char **env_ptr;
